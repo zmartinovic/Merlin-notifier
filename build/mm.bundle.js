@@ -3394,8 +3394,8 @@ angular.module('mm.core')
         priority: 500,
         compile: function(el, attrs) {
             attrs.$set('type',
-                null,               
-                false               
+                null,
+                false
             );
         }
     }
@@ -3486,7 +3486,7 @@ angular.module('mm.core.login', [])
         url: '/mm_login',
         abstract: true,
         templateUrl: 'core/components/login/templates/base.html',
-        cache: false,  
+        cache: false,
         onEnter: function($ionicHistory, $state, $mmSitesManager, $mmSite) {
             $ionicHistory.clearHistory();
         }
@@ -5375,6 +5375,7 @@ angular.module('mm.addons.calendar')
                         title: event.name,
                         message: startDate.toLocaleString(),
                         at: dateTriggered,
+                        smallIcon: 'res://icon',
                         data: {
                             eventid: event.id,
                             siteid: siteid
