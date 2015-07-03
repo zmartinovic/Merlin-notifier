@@ -38,44 +38,6 @@ angular.module('mm.core', ['pascalprecht.translate'])
         return $delegate;
     }]);
         $provide.decorator('$log', ['$delegate', $mmLogProvider.logDecorator]);
-    var $mmStateProvider = {
-        state: function(name, stateConfig) {
-            function setupTablet(state) {
-                if (!state.tablet) {
-                    return;
-                }
-                if (angular.isString(state.tablet)) {
-                    state.tablet = {
-                        parent: state.tablet
-                    }
-                }
-                var params = state.tablet,
-                    parent = params.parent,
-                    node = params.node || 'tablet',
-                    config = {};
-                delete state['tablet'];
-                delete params['node'];
-                delete params['parent'];
-                angular.copy(state, config);
-                angular.extend(config, params);
-                if (config.views.length > 1) {
-                    console.log('Cannot guess the view data to use for tablet state of ' + name);
-                    return;
-                }
-                var viewName, viewData;
-                angular.forEach(config.views, function(v, k) {
-                    viewName = k;
-                    viewData = v;
-                }, this);
-                delete config.views[viewName];
-                config.views['tablet'] = viewData;
-                $stateProvider.state.apply($stateProvider, [parent + '.' + node, config]);
-            }
-            setupTablet.apply(this, [stateConfig]);
-            $stateProvider.state.apply($stateProvider, [name, stateConfig]);
-            return this;
-        }
-    };
     $stateProvider
         .state('redirect', {
             url: '/redirect',
@@ -134,7 +96,7 @@ angular.module('mm.core', ['pascalprecht.translate'])
 });
 
 angular.module('mm.core')
-.provider('$mmApp', function() {
+.provider('$mmApp', function($stateProvider) {
         var DBNAME = 'MoodleMobile',
         dbschema = {
             stores: []
@@ -167,9 +129,14 @@ angular.module('mm.core')
         });
         return exists;
     }
-    this.$get = function($mmDB, $cordovaNetwork, $q) {
+    this.$get = function($mmDB, $cordovaNetwork, $q, $log) {
+        $log = $log.getInstance('$mmApp');
         var db = $mmDB.getDB(DBNAME, dbschema, dboptions),
             self = {};
+                self.createState = function(name, config) {
+            $log.debug('Adding new state: '+name);
+            $stateProvider.state(name, config);
+        };
                 self.getDB = function() {
             return db;
         };
@@ -3463,24 +3430,10 @@ angular.module('mm.core')
 
 angular.module('mm.core')
 .directive('mmLoading', function($translate) {
-        function findLoadingAndContent(element, obj) {
-        var divs = element.find('div');
-        for (var i = 0; i < divs.length && (typeof(obj.loading) == 'undefined' || typeof(obj.content) == 'undefined'); i++) {
-            var className = divs[i].className;
-            if (className.indexOf('mm-loading-container') > -1) {
-                obj.loading = angular.element(divs[i]);
-            } else if(className.indexOf('mm-loading-content') > -1) {
-                obj.content = angular.element(divs[i]);
-            }
-        }
-    }
-    function setMessage(element, message) {
-        var p = element.find('p');
-        for (var i = 0; i < p.length; i++) {
-            var className = p[i].className;
-            if (className.indexOf('mm-loading-message') > -1) {
-                p[i].innerHTML = message;
-            }
+        function setMessage(el, message) {
+        var messageEl = angular.element(el.querySelector('.mm-loading-message'));
+        if (messageEl) {
+            messageEl.html(message);
         }
     }
     return {
@@ -3488,23 +3441,26 @@ angular.module('mm.core')
         templateUrl: 'core/templates/loading.html',
         transclude: true,
         link: function(scope, element, attrs) {
-            var children = {};
+            var el = element[0],
+                loading,
+                content;
             if (attrs.message) {
-                setMessage(element, attrs.message);
+                setMessage(el, attrs.message);
             } else {
                 $translate('mm.core.loading').then(function(loadingString) {
-                    setMessage(element, loadingString);
+                    setMessage(el, loadingString);
                 });
             }
             if (attrs.hideUntil) {
-                findLoadingAndContent(element, children);
+                loading = angular.element(el.querySelector('.mm-loading-container'));
+                content = angular.element(el.querySelector('.mm-loading-content'));
                 scope.$watch(attrs.hideUntil, function(newValue) {
                     if (newValue) {
-                        children.loading.addClass('hide');
-                        children.content.removeClass('hide');
+                        loading.addClass('hide');
+                        content.removeClass('hide');
                     } else {
-                        children.content.addClass('hide');
-                        children.loading.removeClass('hide');
+                        content.addClass('hide');
+                        loading.removeClass('hide');
                     }
                 });
             }
@@ -3524,6 +3480,155 @@ angular.module('mm.core')
             );
         }
     }
+});
+
+angular.module('mm.core')
+.constant('mmCoreSplitViewLoad', 'mmSplitView:load')
+.directive('mmSplitView', function($log, $state, $ionicPlatform, $timeout, mmCoreSplitViewLoad) {
+    $log = $log.getInstance('mmSplitView');
+        function triggerClick(link) {
+        if (link && link.length && link.triggerHandler) {
+            link.triggerHandler('click');
+            return true;
+        }
+        return false;
+    }
+    function controller() {
+        var self = this,
+            menuState,
+            linkToLoad;
+                this.setLink = function(link) {
+            linkToLoad = link;
+        };
+                this.loadLink = function(el, retrying) {
+            if ($ionicPlatform.isTablet()) {
+                if (!linkToLoad) {
+                    linkToLoad = angular.element(el.querySelector('[mm-split-view-link]'));
+                }
+                if (!triggerClick(linkToLoad)) {
+                    if (!retrying) {
+                        linkToLoad = undefined;
+                        $timeout(function() {
+                            self.loadLink(el, true);
+                        });
+                    }
+                }
+            }
+        };
+                this.getMenuState = function() {
+            return menuState || $state.current.name;
+        };
+                this.setMenuState = function(state) {
+            menuState = state;
+        };
+    }
+    return {
+        restrict: 'E',
+        templateUrl: 'core/templates/splitview.html',
+        transclude: true,
+        controller: controller,
+        link: function(scope, element, attrs, controller) {
+            var el = element[0],
+                menu = angular.element(el.querySelector('.mm-split-pane-menu')),
+                menuState = $state.current.name,
+                menuWidth = attrs.menuWidth;
+            controller.setMenuState(menuState);
+            if (menuWidth && $ionicPlatform.isTablet()) {
+                menu.css('width', menuWidth);
+                menu.css('-webkit-flex-basis', menuWidth);
+                menu.css('-moz-flex-basis', menuWidth);
+                menu.css('-ms-flex-basis', menuWidth);
+                menu.css('flex-basis', menuWidth);
+            }
+            if (attrs.loadWhen) {
+                scope.$watch(attrs.loadWhen, function(newValue) {
+                    if (newValue) {
+                        controller.loadLink(el);
+                    }
+                });
+            } else {
+                controller.loadLink(el);
+            }
+            scope.$on('$stateChangeSuccess', function(event, toState, toParams, fromState, fromParams) {
+                if (toState.name === menuState) {
+                    controller.loadLink(el);
+                }
+            });
+            scope.$on(mmCoreSplitViewLoad, function() {
+                controller.loadLink(el);
+            });
+        }
+    };
+});
+
+angular.module('mm.core')
+.directive('mmSplitViewLink', function($log, $ionicPlatform, $state, $mmApp) {
+    $log = $log.getInstance('mmSplitViewLink');
+    var srefRegex = new RegExp(/([^\(]*)(\([^\)]*\))?/);
+        function createTabletState(stateName, tabletStateName) {
+        var targetState = $state.get(stateName),
+            newConfig,
+            viewName;
+        if (targetState) {
+            newConfig = angular.copy(targetState);
+            viewName = Object.keys(newConfig.views)[0];
+            newConfig.views.tablet = newConfig.views[viewName];
+            delete newConfig.views[viewName];
+            delete newConfig['name'];
+            $mmApp.createState(tabletStateName, newConfig);
+            return true;
+        } else {
+            $log.error('State doesn\'t exist: '+stateName);
+            return false;
+        }
+    }
+    return {
+        restrict: 'A',
+        require: '^mmSplitView',
+        link: function(scope, element, attrs, splitViewController) {
+            var sref = attrs.mmSplitViewLink,
+                menuState = splitViewController.getMenuState(),
+                matches,
+                stateName,
+                stateParams,
+                tabletStateName;
+            if (sref) {
+                matches = sref.match(srefRegex);
+                if (matches && matches.length) {
+                    stateName = matches[1];
+                    stateParams = matches[2];
+                    if (typeof stateParams == 'string') {
+                        try {
+                            stateParams = scope.$eval(stateParams);
+                        } catch(ex) {
+                            $log.error('Error parsing parameters: ' + stateParams);
+                            stateParams = undefined;
+                        }
+                    }
+                    tabletStateName = menuState + '.' + stateName.substr(stateName.lastIndexOf('.') + 1);
+                    element.on('click', function(event) {
+                        event.stopPropagation();
+                        event.preventDefault();
+                        if ($ionicPlatform.isTablet()) {
+                            if (!$state.get(tabletStateName)) {
+                                if (!createTabletState(stateName, tabletStateName)) {
+                                    return;
+                                }
+                            }
+                            splitViewController.setLink(element);
+                            $state.go(tabletStateName, stateParams, {location:'replace'});
+                        } else {
+                            $state.go(stateName, stateParams);
+                        }
+                    });
+                } else {
+                    $log.error('Invalid sref.');
+                }
+            } else {
+                $log.error('Invalid sref.');
+            }
+        }
+    };
 });
 
 angular.module('mm.core.course', [])
@@ -3911,9 +4016,6 @@ angular.module('mm.core.course')
             $mmUtil.showErrorModal('mm.course.couldnotloadsections', true);
         });
     }
-    $scope.getState = function() {
-        return 'site.mm_course-section';
-    };
     $scope.doRefresh = function() {
         loadSections(true).finally(function() {
             $scope.$broadcast('scroll.refreshComplete');
@@ -4537,9 +4639,6 @@ angular.module('mm.core.settings')
 
 angular.module('mm.core.settings')
 .controller('mmSettingsListCtrl', function($scope, $mmSettingsDelegate) {
-    $scope.getState = function(name) {
-        return 'site.mm_settings-' + name;
-    };
     var plugins = $mmSettingsDelegate.getData();
     $scope.plugins = plugins;
 });
@@ -4705,6 +4804,20 @@ angular.module('mm.core.sidemenu')
     return self;
 });
 
+angular.module('mm.core')
+.directive('mmUserLink', function($state, mmUserProfileState) {
+    return {
+        restrict: 'A',
+        link: function(scope, element, attrs) {
+            element.on('click', function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                $state.go(mmUserProfileState, {courseid: attrs.courseid, userid: attrs.userid});
+            });
+        }
+    };
+});
+
 angular.module('mm.core.user')
 .controller('mmUserProfileCtrl', function($scope, $state, $stateParams, $mmUtil, $mmUser, $mmUserDelegate, $mmSite) {
     var courseid = $stateParams.courseid,
@@ -4733,20 +4846,6 @@ angular.module('mm.core.user')
     }).finally(function() {
         $scope.userLoaded = true;
     });
-});
-
-angular.module('mm.core')
-.directive('mmUserLink', function($state, mmUserProfileState) {
-    return {
-        restrict: 'A',
-        link: function(scope, element, attrs) {
-            element.on('click', function(event) {
-                event.preventDefault();
-                event.stopPropagation();
-                $state.go(mmUserProfileState, {courseid: attrs.courseid, userid: attrs.userid});
-            });
-        }
-    };
 });
 
 angular.module('mm.core.user')
@@ -5626,8 +5725,6 @@ angular.module('mm.addons.calendar')
                     return fetchEvents();
                 }
             } else {
-                $scope.eventsLoaded = true;
-                $scope.canLoadMore = true;
                 angular.forEach(events, $mmaCalendar.formatEventData);
                 if (refresh) {
                     $scope.events = events;
@@ -5635,6 +5732,8 @@ angular.module('mm.addons.calendar')
                     $scope.events = $scope.events.concat(events);
                 }
                 $scope.count = $scope.events.length;
+                $scope.eventsLoaded = true;
+                $scope.canLoadMore = true;
                 $mmaCalendar.scheduleEventsNotifications(events);
             }
         }, function(err) {
@@ -6752,7 +6851,7 @@ angular.module('mm.addons.grades')
     return self;
 });
 angular.module('mm.addons.messages')
-.controller('mmaMessagesContactsCtrl', function($q, $scope, $mmaMessages, $mmSite, $mmUtil) {
+.controller('mmaMessagesContactsCtrl', function($q, $scope, $mmaMessages, $mmSite, $mmUtil, mmUserProfileState) {
     var currentUserId = $mmSite.getUserId();
     $scope.loaded = false;
     $scope.contactTypes = ['online', 'offline', 'blocked', 'strangers', 'search'];
@@ -6761,6 +6860,7 @@ angular.module('mm.addons.messages')
     $scope.formData = {
         searchString: ''
     };
+    $scope.userStateName = mmUserProfileState;
     $scope.refresh = function() {
         $mmaMessages.invalidateAllContactsCache(currentUserId).then(function() {
             return fetchContacts(true).then(function() {
@@ -6942,7 +7042,7 @@ angular.module('mm.addons.messages')
 });
 
 angular.module('mm.addons.messages')
-.controller('mmaMessagesDiscussionsCtrl', function($q, $state, $scope, $mmUtil, $mmaMessages) {
+.controller('mmaMessagesDiscussionsCtrl', function($q, $state, $scope, $mmUtil, $mmaMessages, $rootScope, mmCoreSplitViewLoad) {
     $scope.loaded = false;
     function fetchDiscussions() {
         return $mmaMessages.getDiscussions().then(function(discussions) {
@@ -6974,6 +7074,7 @@ angular.module('mm.addons.messages')
     };
     fetchDiscussions().finally(function() {
         $scope.loaded = true;
+        $rootScope.$broadcast(mmCoreSplitViewLoad);
     });
 });
 
@@ -8152,7 +8253,7 @@ angular.module('mm.addons.mod_forum')
 });
 
 angular.module('mm.addons.mod_forum')
-.controller('mmaModForumDiscussionsCtrl', function($scope, $stateParams, $mmaModForum, $mmSite, $mmUtil) {
+.controller('mmaModForumDiscussionsCtrl', function($scope, $stateParams, $mmaModForum, $mmSite, $mmUtil, mmUserProfileState) {
     var module = $stateParams.module || {},
         courseid = $stateParams.courseid,
         forum,
@@ -8161,6 +8262,7 @@ angular.module('mm.addons.mod_forum')
     $scope.description = module.description;
     $scope.moduleurl = module.url;
     $scope.courseid = courseid;
+    $scope.userStateName = mmUserProfileState;
     function fetchForumDataAndDiscussions(refresh) {
         return $mmaModForum.getForum(courseid, module.id).then(function(forumdata) {
             if (forumdata) {
@@ -9442,9 +9544,6 @@ angular.module('mm.addons.notes')
     var course = $stateParams.course,
         courseid = course.id;
     $scope.courseid = courseid;
-    $scope.getState = function() {
-        return 'site.notes-list';
-    };
 });
 
 angular.module('mm.addons.notes')
@@ -9727,11 +9826,13 @@ angular.module('mm.addons.notifications')
 });
 
 angular.module('mm.addons.participants')
-.controller('mmaParticipantsListCtrl', function($scope, $state, $stateParams, $mmUtil, $mmaParticipants, $ionicPlatform, $mmSite) {
+.controller('mmaParticipantsListCtrl', function($scope, $state, $stateParams, $mmUtil, $mmaParticipants, $ionicPlatform, $mmSite,
+            mmUserProfileState) {
     var course = $stateParams.course,
         courseid = course.id;
     $scope.participants = [];
     $scope.courseid = courseid;
+    $scope.userStateName = mmUserProfileState;
     function fetchParticipants(refresh) {
         var firstToGet = refresh ? 0 : $scope.participants.length;
         return $mmaParticipants.getParticipants(courseid, firstToGet).then(function(data) {
