@@ -21,7 +21,7 @@ angular.module('mm.addons.messages')
  * @ngdoc controller
  * @name mmaMessagesDiscussionsCtrl
  */
-.controller('mmaMessagesDiscussionsCtrl', function($q, $state, $scope, $mmUtil, $mmaMessages) {
+.controller('mmaMessagesDiscussionsCtrl', function($q, $state, $scope, $mmUtil, $mmaMessages, $rootScope, mmCoreSplitViewLoad) {
     $scope.loaded = false;
 
     function fetchDiscussions() {
@@ -58,6 +58,7 @@ angular.module('mm.addons.messages')
 
     fetchDiscussions().finally(function() {
         $scope.loaded = true;
+        $rootScope.$broadcast(mmCoreSplitViewLoad);
     });
 });
 

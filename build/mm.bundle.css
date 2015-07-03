@@ -7959,8 +7959,14 @@ input.mma-files-picker {
 .button.mma-messages-clear-search {
   top: 0px; }
 
+.mma-book-arrows {
+  font-size: 32px; }
+
 .mma-forum-discussion-link {
   text-decoration: none; }
+
+.mma-imscp-arrows {
+  font-size: 32px; }
 
 .button.active, .button.activated {
   box-shadow: none;
