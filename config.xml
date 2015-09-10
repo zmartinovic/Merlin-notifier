@@ -5,10 +5,10 @@
         id        = "com.moodle.merlinmobile"
         versionCode = "2002"
         version   = "2.1">
-    <name>Moodle Mobile</name>
+    <name>Merlin Mobile</name>
 
     <description>
-        Moodle Mobile official app
+        Merlin Mobile official app
     </description>
 
     <author href="http://moodle.com" email="mobile@moodle.com">
