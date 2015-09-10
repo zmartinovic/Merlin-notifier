@@ -1,0 +1,23 @@
+{
+    "about": "O",
+    "appname": "Merlin Mobile {{version}}",
+    "cacheexpirationtime": "Vrijeme trajanja međuspremnika (miliseconds)",
+    "credits": "Credits",
+    "deletesitefilestitle": "Izbriši datoteke sjedišta",
+    "deletesitefiles": "Jeste li sigurni da želite izbrisati sve preuzete datoteke sjedišta  '{{sitename}}'?",
+    "development": "Razvoj",
+    "enabledebugging": "Omogući debugging",
+    "errordeletesitefiles": "Greška prilikom brisanja datoteka.",
+    "errorsyncsite": "Greška prilikom sinkronizacije datoteka, molimo provjerite poveznicu na Internet i pokušajte ponovno.",
+    "estimatedfreespace": "Procijenjeni slobodni prostor",
+    "general": "Općenito",
+    "language": "Jeik",
+    "license": "License",
+    "settings": "Postavke",
+    "spaceusage": "Iskorištenost prostora",
+    "synchronization": "Sinkronizacija",
+    "synchronizenow": "Sinkroniziraj sada",
+    "synchronizing": "Sinkroniziranje",
+    "syncsitesuccess": "Podaci sjedišta su sinkronizirai i međuspremnici više ne vrijede.",
+    "total": "Ukupno"
+}
