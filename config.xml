@@ -27,6 +27,7 @@
     <access origin="mailto:*" launch-external="yes" />
     <access origin="geo:*" launch-external="yes" />
 
+    <preference name="phonegap-version" value="3.7.0" />
     <preference name="orientation"      value="default" />
     <preference name="target-device"    value="universal" />
     <preference name="fullscreen"       value="false" />
@@ -47,6 +48,7 @@
     <preference name="AndroidPersistentFileLocation"    value="Compatibility" />
     <preference name="iosPersistentFileLocation"        value="Compatibility" />
 
+    <icon src="icon.png" />
     <icon src="resources/android/icon/icon-36-ldpi.png"       gap:platform="android"    gap:density="ldpi" />
     <icon src="resources/android/icon/icon-48-mdpi.png"       gap:platform="android"    gap:density="mdpi" />
     <icon src="resources/android/icon/icon-72-hdpi.png"       gap:platform="android"    gap:density="hdpi" />
